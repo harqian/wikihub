@@ -161,12 +161,23 @@ def get_renderer():
     return _renderer
 
 
+def _strip_frontmatter(content):
+    """strip YAML frontmatter (--- delimited) from markdown content."""
+    if not content.startswith("---"):
+        return content
+    parts = content.split("---", 2)
+    if len(parts) >= 3:
+        return parts[2]
+    return content
+
+
 def render_markdown(content, resolve_wikilinks=None):
     """render markdown content to HTML.
 
     resolve_wikilinks: optional callback(target) -> (url, exists)
     to resolve [[wikilinks]] to actual URLs and mark unresolved ones.
     """
+    content = _strip_frontmatter(content)
     md = get_renderer()
     html = md.render(content)
 
