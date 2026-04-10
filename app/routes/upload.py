@@ -132,9 +132,13 @@ def _process_zip(username, slug, wiki_id, zip_file):
         if len(entries) > max_files:
             raise ValueError(f"Zip contains {len(entries)} files, max is {max_files}")
 
+        oversized = [i.filename for i in entries if i.file_size > max_page]
+        if oversized:
+            names = ", ".join(oversized[:5])
+            more = f" (+{len(oversized) - 5} more)" if len(oversized) > 5 else ""
+            raise ValueError(f"Files too large (2MB max): {names}{more}")
+
         for info in entries:
-            if info.file_size > max_page:
-                continue  # silently skip files over 2MB
 
             filepath = info.filename
             content = zf.read(info)
