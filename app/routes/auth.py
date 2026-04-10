@@ -72,7 +72,7 @@ def signup():
         db.session.commit()
 
         login_user(user)
-        return redirect(url_for("main.index"))
+        return redirect(url_for("wiki.user_profile", username=user.username))
 
     return render_template("auth/signup.html")
 
