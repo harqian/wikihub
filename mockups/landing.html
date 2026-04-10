@@ -242,34 +242,157 @@
       line-height: 1.55;
     }
 
-    .hero-agent {
-      font-size: 0.9375rem;
-      color: var(--text-tertiary);
-      max-width: 500px;
-      margin: 0 auto 36px;
-      line-height: 1.55;
+    /* ── hero dual panels ────────────────── */
+
+    .hero-panels {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 4px;
     }
 
-    .hero-agent code {
+    @media (min-width: 640px) {
+      .hero-panels {
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+    }
+
+    .hero-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      padding: 28px 24px;
+      text-align: center;
+      transition: border-color 0.15s ease;
+    }
+
+    .hero-panel:hover {
+      border-color: var(--border-emphasis);
+    }
+
+    .hero-panel-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .hero-panel-title {
+      font-size: 1.0625rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+
+    .hero-panel-desc {
+      font-size: 0.8125rem;
+      color: var(--text-tertiary);
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    /* drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border-strong);
+      border-radius: var(--radius-md);
+      padding: 32px 16px;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .drop-zone:hover {
+      border-color: var(--accent);
+      background: var(--accent-subtle);
+    }
+
+    .drop-zone-icon {
+      color: var(--text-muted);
+    }
+
+    .drop-zone-icon svg {
+      width: 32px;
+      height: 32px;
+    }
+
+    .drop-zone:hover .drop-zone-icon {
+      color: var(--accent);
+    }
+
+    .drop-zone-text {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    .drop-zone-text strong {
+      color: var(--accent);
+    }
+
+    .drop-zone-hint {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* code block */
+    .agent-code {
+      background: var(--bg-base);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      text-align: left;
+      position: relative;
+      overflow-x: auto;
+    }
+
+    .agent-code pre {
+      margin: 0;
       font-family: var(--font-mono);
       font-size: 0.8125rem;
+      line-height: 1.65;
       color: var(--text-secondary);
+      white-space: pre;
+    }
+
+    .agent-code .comment {
+      color: var(--text-muted);
+    }
+
+    .agent-code .key {
+      color: var(--accent);
+    }
+
+    .agent-code .string {
+      color: var(--color-public);
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
       background: var(--bg-elevated);
-      padding: 2px 7px;
-      border-radius: var(--radius-sm);
       border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      color: var(--text-tertiary);
+      font-size: 0.6875rem;
+      font-family: var(--font-mono);
+      padding: 4px 10px;
+      cursor: pointer;
+      min-height: 28px;
+      transition: color 0.15s ease, border-color 0.15s ease;
     }
 
-    .hero-cta {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .hero-cta .btn {
-      font-size: 0.9375rem;
-      padding: 12px 28px;
+    .copy-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--border-emphasis);
     }
 
     @media (min-width: 768px) {
@@ -341,74 +464,6 @@
     .divider hr {
       border: none;
       border-top: 1px solid var(--border-default);
-    }
-
-    /* ── how it works / steps ────────────── */
-
-    .steps {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 16px;
-      counter-reset: step;
-    }
-
-    @media (min-width: 768px) {
-      .steps {
-        grid-template-columns: repeat(3, 1fr);
-      }
-    }
-
-    .step {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-default);
-      border-radius: var(--radius-md);
-      padding: 24px 20px;
-      counter-increment: step;
-      transition: border-color 0.15s ease;
-    }
-
-    .step:hover {
-      border-color: var(--border-emphasis);
-    }
-
-    .step-num {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--accent-muted);
-      color: var(--accent);
-      font-family: var(--font-mono);
-      font-size: 0.8125rem;
-      font-weight: 600;
-      margin-bottom: 14px;
-      border: 1px solid var(--border-accent);
-    }
-
-    .step h3 {
-      font-size: 0.9375rem;
-      font-weight: 600;
-      margin-bottom: 8px;
-      color: var(--text-primary);
-      letter-spacing: -0.01em;
-    }
-
-    .step p {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      line-height: 1.55;
-    }
-
-    .step code {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      background: var(--bg-elevated);
-      color: var(--text-secondary);
-      padding: 2px 6px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border-default);
     }
 
     /* ── features grid ───────────────────── */
@@ -773,36 +828,34 @@
   <!-- hero -->
   <section class="hero">
     <h1>Publish a wiki<br>in <em>seconds</em></h1>
-    <p class="hero-sub">Bring your markdown files, create from scratch, or let your agent build it. Your wiki is live the moment it lands.</p>
-    <p class="hero-agent">Full REST API and MCP server built in &mdash; your agent can read, write, and search just like you.</p>
-    <div class="hero-cta">
-      <a href="#" class="btn btn-primary">Get started</a>
-      <a href="#" class="btn btn-secondary">Explore wikis</a>
-    </div>
-  </section>
+    <p class="hero-sub">The home for markdown knowledge bases. Bring your files or let your agent build it.</p>
 
-  <div class="divider"><hr></div>
+    <div class="hero-panels">
+      <div class="hero-panel">
+        <div class="hero-panel-label">You</div>
+        <div class="drop-zone">
+          <div class="drop-zone-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <div class="drop-zone-text"><strong>Drop your wiki here</strong></div>
+          <div class="drop-zone-hint">.md files, folders, or a zip &mdash; or <code style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary);background:var(--bg-elevated);padding:1px 5px;border-radius:3px;">git push</code></div>
+        </div>
+      </div>
 
-  <!-- how it works -->
-  <section class="section">
-    <p class="section-label">Three ways in</p>
-    <h2 class="section-heading">However you work, it works</h2>
-    <p class="section-desc">Bring what you have, build what you need, or let your agent handle it.</p>
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">1</div>
-        <h3>Bring your wiki</h3>
-        <p>Already have markdown files? Drag them in or <code>git push</code> your Obsidian vault. Your wiki is live instantly.</p>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <h3>Start fresh</h3>
-        <p>Create pages in the editor with live preview, wikilink autocomplete, and per-file visibility controls. No local setup needed.</p>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <h3>Let your agent build it</h3>
-        <p>Full REST API and MCP server. Your coding agent can create wikis, add pages, and manage access programmatically.</p>
+      <div class="hero-panel">
+        <div class="hero-panel-label">Your agent</div>
+        <div class="agent-code">
+          <button class="copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.querySelector('pre').textContent)">copy</button>
+          <pre><span class="comment"># add to your MCP config</span>
+{
+  <span class="key">"wikihub"</span>: {
+    <span class="key">"url"</span>: <span class="string">"https://wikihub.md/mcp"</span>
+  }
+}
+
+<span class="comment"># then tell your agent:</span>
+<span class="string">"Create a wiki from ./notes/"</span></pre>
+        </div>
       </div>
     </div>
   </section>
