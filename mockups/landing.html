@@ -347,10 +347,10 @@
       background: var(--bg-base);
       border: 1px solid var(--border-default);
       border-radius: var(--radius-md);
-      padding: 16px;
+      padding: 20px 16px;
+      padding-right: 56px;
       text-align: left;
       position: relative;
-      overflow-x: auto;
     }
 
     .agent-code pre {
@@ -359,7 +359,8 @@
       font-size: 0.8125rem;
       line-height: 1.65;
       color: var(--text-secondary);
-      white-space: pre;
+      white-space: pre-wrap;
+      word-wrap: break-word;
     }
 
     .agent-code .comment {
