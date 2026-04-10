@@ -413,6 +413,7 @@ Each gets a one-off Python script to scrape/transform and produce a zip we uploa
 - **Anti-abuse machinery** — highlighted v2 priorities from architecture validation: (1) IP rate limit on writes (10/min/IP, infra not moderation), (2) panic button toggle to instantly disable anonymous writes per wiki, (3) "revert last N anonymous edits" button in web UI. Remaining: moderation view, bulk revert, under-attack mode, notifications, quarantine, PoW, CAPTCHA, body caps, honeypot, owner notifications
 - Server-hosted cloud agent (talk-to-an-agent-we-host via web UI, per-user folder sandbox via UNIX permissions)
 - Featured curation admin surface (v1 uses most-starred automatically; admin override is v2)
+- **Landing page live background** — featured/popular wiki cards slowly drifting, orbiting, or scrolling behind the hero section as a living backdrop. Pure CSS animation (transform + keyframes, no JS). Cards are real data pulled from the featured wikis endpoint. Shows social proof and makes the page feel alive. Requires enough public wikis to look good — ship after dogfood migrations populate the platform. V1 landing page ships with a clean empty background; this replaces it once there's content worth showing.
 - SFTP upload path (session-batched commits, SSH key endpoint, `sshfs`/`rsync` compatible)
 - Link-share token expiry (v1 link tokens are permanent; add expiry syntax or Postgres-side override in v2)
 - Optimistic locking on REST API (If-Match / ETag / 409 Conflict)
