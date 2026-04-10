@@ -2,14 +2,16 @@
 
 updated as I work. check back here for status.
 
-## in progress
+## completed
 
-- systematic component testing against dev server
-- P0 beads issues (private band warning, per-wiki llms.txt, wikilink rewriting on rename)
+- systematic component testing (zip upload, admin API, wikilinks, private bands, ACL, search, content negotiation, fork, star, zip download, profile, explore, logout)
+- P0 beads: private band warning (wikihub-ais), per-wiki llms.txt (wikihub-bpd), wikilink rewriting on rename (wikihub-h1c)
+- git clone works — owner gets authoritative repo (when auth sent), non-owner gets public mirror
+- browser E2E: signup → profile → new wiki → edit → save → new page → explore → agents → search → login → google oauth (graceful fail)
 
 ## blockers
 
-(none yet)
+(none)
 
 ## assumptions made
 
@@ -22,6 +24,8 @@ updated as I work. check back here for status.
 - **no real-time preview**: the Preview tab in the editor shows plaintext, not rendered markdown. would need either a client-side markdown renderer or an AJAX call to the server to render. deferred.
 
 - **Railway volume for git repos**: persistent volume mounted at /data/repos. if Railway recycles the volume or loses it, all git repos are gone. DB has metadata but content is lost. need backup strategy before real users.
+
+- **git clone auth dance**: git tries unauthenticated first. if the public mirror responds successfully, git never retries with credentials. this means `git clone url` always gets the public mirror. owners need to explicitly provide credentials for git to send them. this is standard git HTTP behavior, not a bug — but it means the owner experience requires `git clone http://user:key@host/...` to get the full repo.
 
 ## questions for Harrison
 
