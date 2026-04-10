@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Edit — AI Agent Landscape — wikihub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --bg-overlay: #1c2128;
+  --border-default: #30363d;
+  --border-muted: #21262d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-tertiary: #6e7681;
+  --accent: #58a6ff;
+  --accent-hover: #79c0ff;
+  --accent-muted: rgba(88, 166, 255, 0.15);
+  --green: #3fb950;
+  --green-muted: rgba(63, 185, 80, 0.15);
+  --red: #f85149;
+  --yellow: #d29922;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Menlo', monospace;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --topbar-height: 56px;
+  --tab-height: 44px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* top bar */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: var(--topbar-height);
+  padding: 0 var(--space-md);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+}
+
+.topbar-logo {
+  font-weight: 600;
+  font-size: 1.125rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.topbar-sep {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.breadcrumb a {
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb-current {
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-spacer {
+  flex: 1;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.btn-primary:active {
+  background: #2ea043;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+
+/* editor container */
+.editor-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* tab bar + visibility row */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  flex-wrap: wrap;
+}
+
+.tab-group {
+  display: flex;
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  overflow: hidden;
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab-btn.active {
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+/* visibility selector */
+.visibility-wrap {
+  position: relative;
+}
+
+.visibility-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.visibility-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.visibility-chevron {
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+}
+
+.visibility-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 200;
+  min-width: 260px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xs) 0;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.visibility-dropdown.hidden {
+  display: none;
+}
+
+.vis-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  min-height: 44px;
+  transition: background 0.1s;
+}
+
+.vis-option:active {
+  background: var(--bg-tertiary);
+}
+
+.vis-option.selected {
+  background: var(--accent-muted);
+}
+
+.vis-option-icon {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  font-size: 1rem;
+}
+
+.vis-option-label {
+  flex: 1;
+}
+
+.vis-option-check {
+  color: var(--accent);
+  font-size: 0.875rem;
+}
+
+.vis-divider {
+  height: 1px;
+  background: var(--border-default);
+  margin: var(--space-xs) 0;
+}
+
+.share-field {
+  padding: var(--space-sm) var(--space-md);
+}
+
+.share-field label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.share-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.share-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.share-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+/* editor area */
+.editor-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-height: 0;
+}
+
+.editor-textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 400px;
+  padding: var(--space-lg);
+  background: var(--bg-primary);
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 14.5px;
+  line-height: 1.7;
+  resize: none;
+  tab-size: 2;
+}
+
+.editor-textarea:focus {
+  outline: none;
+}
+
+.editor-textarea::selection {
+  background: var(--accent-muted);
+}
+
+/* preview pane (hidden by default) */
+.preview-pane {
+  display: none;
+  flex: 1;
+  padding: var(--space-lg);
+  overflow-y: auto;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.preview-pane h1 {
+  font-size: 1.75rem;
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.preview-pane h2 {
+  font-size: 1.375rem;
+  margin-top: var(--space-lg);
+  margin-bottom: var(--space-sm);
+}
+
+.preview-pane ul {
+  padding-left: var(--space-lg);
+  margin-bottom: var(--space-md);
+}
+
+.preview-pane li {
+  margin-bottom: var(--space-xs);
+}
+
+.preview-pane .wikilink {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--accent);
+  cursor: pointer;
+}
+
+.preview-pane code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.preview-pane pre {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  overflow-x: auto;
+  margin-bottom: var(--space-md);
+}
+
+.preview-pane pre code {
+  background: none;
+  padding: 0;
+}
+
+/* autocomplete popover */
+.autocomplete-popover {
+  position: absolute;
+  z-index: 300;
+  min-width: 220px;
+  max-width: 300px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  padding: var(--space-xs) 0;
+}
+
+.ac-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  min-height: 40px;
+  transition: background 0.1s;
+}
+
+.ac-item:active {
+  background: var(--bg-tertiary);
+}
+
+.ac-item.active {
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+.ac-item-icon {
+  color: var(--text-tertiary);
+  font-size: 0.8125rem;
+  flex-shrink: 0;
+}
+
+.ac-item-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* status bar */
+.statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-md);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-default);
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  min-height: 32px;
+  flex-shrink: 0;
+}
+
+/* responsive */
+@media (min-width: 768px) {
+  .editor-textarea {
+    padding: var(--space-xl) clamp(var(--space-xl), 5vw, 80px);
+    font-size: 15px;
+  }
+
+  .preview-pane {
+    padding: var(--space-xl) clamp(var(--space-xl), 5vw, 80px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .editor-textarea {
+    min-height: 600px;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- top bar -->
+<header class="topbar">
+  <a href="#" class="topbar-logo">wikihub</a>
+  <span class="topbar-sep">/</span>
+  <nav class="breadcrumb">
+    <a href="#">@harrison</a>
+    <span class="topbar-sep">/</span>
+    <a href="#">research-wiki</a>
+    <span class="topbar-sep">/</span>
+    <span class="breadcrumb-current">AI Agent Landscape</span>
+  </nav>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost" onclick="handleCancel()">Cancel</button>
+    <button class="btn btn-primary" onclick="handleSave()">Save</button>
+  </div>
+</header>
+
+<!-- toolbar: tabs + visibility -->
+<div class="toolbar">
+  <div class="tab-group">
+    <button class="tab-btn active" data-tab="edit" onclick="switchTab('edit')">Edit</button>
+    <button class="tab-btn" data-tab="preview" onclick="switchTab('preview')">Preview</button>
+  </div>
+  <div class="toolbar-spacer"></div>
+  <div class="visibility-wrap">
+    <button class="visibility-btn" onclick="toggleVisibility()" aria-expanded="false" aria-haspopup="true">
+      <span class="visibility-icon" id="vis-icon-current">&#127760;</span>
+      <span id="vis-label-current">Public (read)</span>
+      <span class="visibility-chevron">&#9662;</span>
+    </button>
+    <div class="visibility-dropdown hidden" id="vis-dropdown">
+      <div class="vis-option" data-vis="private" onclick="selectVisibility(this)">
+        <span class="vis-option-icon">&#128274;</span>
+        <span class="vis-option-label">Private</span>
+        <span class="vis-option-check"></span>
+      </div>
+      <div class="vis-option selected" data-vis="public-read" onclick="selectVisibility(this)">
+        <span class="vis-option-icon">&#127760;</span>
+        <span class="vis-option-label">Public (read)</span>
+        <span class="vis-option-check">&#10003;</span>
+      </div>
+      <div class="vis-option" data-vis="public-edit" onclick="selectVisibility(this)">
+        <span class="vis-option-icon">&#9998;</span>
+        <span class="vis-option-label">Public (edit)</span>
+        <span class="vis-option-check"></span>
+      </div>
+      <div class="vis-option" data-vis="unlisted-read" onclick="selectVisibility(this)">
+        <span class="vis-option-icon">&#128279;</span>
+        <span class="vis-option-label">Unlisted (read)</span>
+        <span class="vis-option-check"></span>
+      </div>
+      <div class="vis-option" data-vis="unlisted-edit" onclick="selectVisibility(this)">
+        <span class="vis-option-icon">&#128279;</span>
+        <span class="vis-option-label">Unlisted (edit)</span>
+        <span class="vis-option-check"></span>
+      </div>
+      <div class="vis-divider"></div>
+      <div class="share-field">
+        <label for="share-input">Share with user</label>
+        <input type="text" id="share-input" class="share-input" placeholder="@username">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- editor body -->
+<div class="editor-wrap">
+  <div class="editor-body">
+    <textarea class="editor-textarea" id="editor" spellcheck="false">---
+visibility: public
+tags: [agents, research]
+---
+
+# AI Agent Landscape
+
+The current generation of coding agents...
+
+## Key Players
+
+- [[OpenAI]] — GPT series, Codex
+- [[Anthropic]] — Claude, with tool use
+- [[Google]] — Gemini, with code execution
+
+See also: [[Agent Protocols]]
+
+$$E = mc^2$$
+
+```python
+def hello():
+    print("hello from wikihub")
+```</textarea>
+
+    <!-- preview pane (toggled via tabs) -->
+    <div class="preview-pane" id="preview-pane">
+      <h1>AI Agent Landscape</h1>
+      <p>The current generation of coding agents...</p>
+      <h2>Key Players</h2>
+      <ul>
+        <li><a class="wikilink" href="#">OpenAI</a> &mdash; GPT series, Codex</li>
+        <li><a class="wikilink" href="#">Anthropic</a> &mdash; Claude, with tool use</li>
+        <li><a class="wikilink" href="#">Google</a> &mdash; Gemini, with code execution</li>
+      </ul>
+      <p>See also: <a class="wikilink" href="#">Agent Protocols</a></p>
+      <p><em>E = mc&sup2;</em></p>
+      <pre><code>def hello():
+    print("hello from wikihub")</code></pre>
+    </div>
+
+    <!-- wikilink autocomplete popover (static, visible) -->
+    <div class="autocomplete-popover" id="ac-popover">
+      <div class="ac-item active">
+        <span class="ac-item-icon">&#128196;</span>
+        <span class="ac-item-title">OpenAI</span>
+      </div>
+      <div class="ac-item">
+        <span class="ac-item-icon">&#128196;</span>
+        <span class="ac-item-title">Anthropic</span>
+      </div>
+      <div class="ac-item">
+        <span class="ac-item-icon">&#128196;</span>
+        <span class="ac-item-title">Agent Protocols</span>
+      </div>
+      <div class="ac-item">
+        <span class="ac-item-icon">&#128196;</span>
+        <span class="ac-item-title">Research Notes</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- status bar -->
+  <div class="statusbar">
+    <span>Markdown &middot; 18 lines</span>
+    <span>Ln 11, Col 5</span>
+  </div>
+</div>
+
+<script>
+// position autocomplete popover near the [[OpenAI]] text in the textarea
+function positionAutocomplete() {
+  var textarea = document.getElementById('editor');
+  var popover = document.getElementById('ac-popover');
+  var text = textarea.value;
+
+  // find the first [[ occurrence
+  var wikiPos = text.indexOf('[[OpenAI]]');
+  if (wikiPos === -1) return;
+
+  // count lines and column offset up to that position
+  var lines = text.substring(0, wikiPos).split('\n');
+  var lineNum = lines.length;
+  var colNum = lines[lines.length - 1].length;
+
+  var style = getComputedStyle(textarea);
+  var lineHeight = parseFloat(style.lineHeight) || 24;
+  var charWidth = 8.7;
+
+  var rect = textarea.getBoundingClientRect();
+  var paddingTop = parseFloat(style.paddingTop);
+  var paddingLeft = parseFloat(style.paddingLeft);
+
+  var top = rect.top + paddingTop + (lineNum * lineHeight) + window.scrollY;
+  var left = rect.left + paddingLeft + (colNum * charWidth);
+
+  // clamp so it doesn't overflow viewport
+  left = Math.min(left, window.innerWidth - 240);
+  left = Math.max(8, left);
+
+  popover.style.top = top + 'px';
+  popover.style.left = left + 'px';
+}
+
+// tab switching
+function switchTab(tab) {
+  var btns = document.querySelectorAll('.tab-btn');
+  for (var i = 0; i < btns.length; i++) {
+    if (btns[i].dataset.tab === tab) {
+      btns[i].classList.add('active');
+    } else {
+      btns[i].classList.remove('active');
+    }
+  }
+
+  var textarea = document.getElementById('editor');
+  var preview = document.getElementById('preview-pane');
+  var popover = document.getElementById('ac-popover');
+
+  if (tab === 'edit') {
+    textarea.style.display = '';
+    preview.style.display = 'none';
+    popover.style.display = '';
+  } else {
+    textarea.style.display = 'none';
+    preview.style.display = '';
+    popover.style.display = 'none';
+  }
+}
+
+// visibility dropdown
+function toggleVisibility() {
+  var dropdown = document.getElementById('vis-dropdown');
+  var btn = document.querySelector('.visibility-btn');
+  var isHidden = dropdown.classList.contains('hidden');
+  dropdown.classList.toggle('hidden');
+  btn.setAttribute('aria-expanded', String(isHidden));
+}
+
+function selectVisibility(el) {
+  var label = el.querySelector('.vis-option-label').textContent;
+  var iconEl = el.querySelector('.vis-option-icon');
+  var iconText = iconEl.textContent;
+
+  document.getElementById('vis-label-current').textContent = label;
+  document.getElementById('vis-icon-current').textContent = iconText;
+
+  var options = document.querySelectorAll('.vis-option');
+  for (var i = 0; i < options.length; i++) {
+    options[i].classList.remove('selected');
+    options[i].querySelector('.vis-option-check').textContent = '';
+  }
+  el.classList.add('selected');
+  el.querySelector('.vis-option-check').textContent = '\u2713';
+
+  document.getElementById('vis-dropdown').classList.add('hidden');
+}
+
+// close dropdown on outside click
+document.addEventListener('click', function(e) {
+  var wrap = document.querySelector('.visibility-wrap');
+  if (!wrap.contains(e.target)) {
+    document.getElementById('vis-dropdown').classList.add('hidden');
+    document.querySelector('.visibility-btn').setAttribute('aria-expanded', 'false');
+  }
+});
+
+function handleSave() {
+  // mockup only
+}
+
+function handleCancel() {
+  // mockup only
+}
+
+// init
+window.addEventListener('load', positionAutocomplete);
+window.addEventListener('resize', positionAutocomplete);
+</script>
+</body>
+</html>

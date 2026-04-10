@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visibility Panel — wikihub mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --border: #30363d;
+    --border-hover: #484f58;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-tertiary: #6e7681;
+    --accent: #58a6ff;
+    --accent-hover: #79c0ff;
+    --accent-muted: rgba(56,139,253,0.15);
+    --green: #3fb950;
+    --green-muted: rgba(63,185,80,0.15);
+    --orange: #d29922;
+    --orange-muted: rgba(210,153,34,0.15);
+    --red: #f85149;
+    --red-muted: rgba(248,81,73,0.15);
+    --purple: #bc8cff;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --radius: 6px;
+    --radius-lg: 8px;
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --space-2xl: 48px;
+    --touch-min: 44px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background: var(--bg-primary);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── section labels ── */
+  .demo-section {
+    max-width: 800px;
+    margin: var(--space-2xl) auto;
+    padding: 0 var(--space-md);
+  }
+  .demo-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── standalone panel (centered) ── */
+  .vis-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 360px;
+    overflow: hidden;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+  }
+  .vis-panel-header {
+    padding: var(--space-md);
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .vis-panel-header .close-btn {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    font-size: 18px;
+    cursor: pointer;
+    min-width: var(--touch-min);
+    min-height: var(--touch-min);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    margin: -8px -8px -8px 0;
+  }
+  .vis-panel-header .close-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+
+  .vis-options { padding: var(--space-sm) 0; }
+  .vis-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    min-height: var(--touch-min);
+    transition: background 0.1s;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    font-family: var(--font-body);
+    color: var(--text-primary);
+  }
+  .vis-option:hover { background: var(--bg-tertiary); }
+  .vis-option.selected { background: var(--accent-muted); }
+  .vis-option .vis-opt-icon {
+    font-size: 18px;
+    min-width: 44px;
+    text-align: left;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .vis-option .vis-opt-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .vis-option .vis-opt-label {
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .vis-option .vis-opt-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 1px;
+  }
+  .vis-option .vis-opt-check {
+    color: var(--accent);
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  /* share section */
+  .share-section {
+    border-top: 1px solid var(--border);
+    padding: var(--space-md);
+  }
+  .share-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-sm);
+  }
+  .share-input-row {
+    display: flex;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+    align-items: stretch;
+  }
+  .share-input-row input {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    min-height: var(--touch-min);
+  }
+  .share-input-row input::placeholder { color: var(--text-tertiary); }
+  .share-input-row input:focus { outline: none; border-color: var(--accent); }
+
+  .perm-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .perm-toggle button {
+    padding: 6px 12px;
+    background: var(--bg-primary);
+    border: none;
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 13px;
+    cursor: pointer;
+    min-height: var(--touch-min);
+    min-width: var(--touch-min);
+  }
+  .perm-toggle button + button { border-left: 1px solid var(--border); }
+  .perm-toggle button.active {
+    background: var(--accent-muted);
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .perm-toggle button:hover:not(.active) { background: var(--bg-tertiary); }
+
+  .btn-add {
+    padding: 6px 16px;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius);
+    color: #fff;
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    min-height: var(--touch-min);
+    flex-shrink: 0;
+  }
+  .btn-add:hover { background: var(--accent-hover); }
+
+  .share-list {
+    list-style: none;
+    margin-top: var(--space-sm);
+  }
+  .share-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) 0;
+    border-top: 1px solid var(--border);
+    min-height: var(--touch-min);
+  }
+  .share-list .share-user {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 14px;
+  }
+  .share-list .share-user .user-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+  .share-list .share-user .username {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+  .share-list .share-perm {
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--bg-tertiary);
+  }
+  .share-list .share-perm.edit { color: var(--accent); background: var(--accent-muted); }
+  .share-list .share-perm.read { color: var(--green); background: var(--green-muted); }
+  .share-list .share-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+  .share-remove {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    font-size: 16px;
+    cursor: pointer;
+    min-width: var(--touch-min);
+    min-height: var(--touch-min);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+  }
+  .share-remove:hover { background: var(--red-muted); color: var(--red); }
+
+  /* ── in-context: toolbar ── */
+  .toolbar-demo {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-sm) var(--space-md);
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+    position: relative;
+    max-width: 700px;
+  }
+  .toolbar-path {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-secondary);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-shrink: 0;
+  }
+  .toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: 6px 12px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 13px;
+    cursor: pointer;
+    min-height: var(--touch-min);
+    white-space: nowrap;
+  }
+  .toolbar-btn:hover { border-color: var(--border-hover); color: var(--text-primary); background: var(--bg-tertiary); }
+  .toolbar-btn.vis-trigger {
+    border-color: var(--green);
+    color: var(--green);
+    background: var(--green-muted);
+  }
+  .toolbar-btn.vis-trigger:hover {
+    background: rgba(63,185,80,0.25);
+  }
+  .toolbar-save {
+    padding: 6px 16px;
+    background: var(--green);
+    border: none;
+    border-radius: var(--radius);
+    color: #fff;
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    min-height: var(--touch-min);
+  }
+
+  /* dropdown positioned from toolbar */
+  .toolbar-dropdown-wrapper {
+    position: relative;
+    display: inline-flex;
+  }
+  .toolbar-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 50;
+  }
+
+  /* center helper for standalone */
+  .center-panel {
+    display: flex;
+    justify-content: center;
+  }
+
+  @media (max-width: 767px) {
+    .demo-section { margin: var(--space-lg) auto; }
+    .vis-panel { max-width: 100%; }
+    .share-input-row { flex-wrap: wrap; }
+    .share-input-row input { min-width: 100%; }
+    .toolbar-demo { flex-direction: column; align-items: stretch; }
+    .toolbar-path { width: 100%; }
+    .toolbar-actions { justify-content: flex-end; }
+    .toolbar-dropdown { right: auto; left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── STANDALONE PANEL (centered) ─── -->
+<div class="demo-section">
+  <div class="demo-label">Standalone — visibility &amp; sharing panel</div>
+  <div class="center-panel">
+    <div class="vis-panel">
+      <div class="vis-panel-header">
+        Page visibility
+        <button class="close-btn" aria-label="Close">×</button>
+      </div>
+
+      <div class="vis-options">
+        <button class="vis-option">
+          <span class="vis-opt-icon">🔒</span>
+          <div class="vis-opt-text">
+            <div class="vis-opt-label">Private</div>
+            <div class="vis-opt-desc">Only you can see this page</div>
+          </div>
+          <span class="vis-opt-check"></span>
+        </button>
+
+        <button class="vis-option selected">
+          <span class="vis-opt-icon">🌐</span>
+          <div class="vis-opt-text">
+            <div class="vis-opt-label">Public (read)</div>
+            <div class="vis-opt-desc">Anyone can read, only you can edit</div>
+          </div>
+          <span class="vis-opt-check">✓</span>
+        </button>
+
+        <button class="vis-option">
+          <span class="vis-opt-icon">🌐 ✏️</span>
+          <div class="vis-opt-text">
+            <div class="vis-opt-label">Public (edit)</div>
+            <div class="vis-opt-desc">Anyone can read and edit, no account required</div>
+          </div>
+          <span class="vis-opt-check"></span>
+        </button>
+
+        <button class="vis-option">
+          <span class="vis-opt-icon">👁</span>
+          <div class="vis-opt-text">
+            <div class="vis-opt-label">Unlisted (read)</div>
+            <div class="vis-opt-desc">Accessible by URL, not discoverable</div>
+          </div>
+          <span class="vis-opt-check"></span>
+        </button>
+
+        <button class="vis-option">
+          <span class="vis-opt-icon">👁 ✏️</span>
+          <div class="vis-opt-text">
+            <div class="vis-opt-label">Unlisted (edit)</div>
+            <div class="vis-opt-desc">Anyone with URL can read and edit</div>
+          </div>
+          <span class="vis-opt-check"></span>
+        </button>
+      </div>
+
+      <div class="share-section">
+        <div class="share-section-title">Share with user</div>
+
+        <div class="share-input-row">
+          <input type="text" placeholder="@username">
+          <div class="perm-toggle">
+            <button class="active">read</button>
+            <button>edit</button>
+          </div>
+          <button class="btn-add">Add</button>
+        </div>
+
+        <ul class="share-list">
+          <li>
+            <div class="share-user">
+              <div class="user-avatar">B</div>
+              <span class="username">@bob</span>
+            </div>
+            <div class="share-right">
+              <span class="share-perm edit">edit</span>
+              <button class="share-remove" aria-label="Remove @bob">×</button>
+            </div>
+          </li>
+          <li>
+            <div class="share-user">
+              <div class="user-avatar">C</div>
+              <span class="username">@carol</span>
+            </div>
+            <div class="share-right">
+              <span class="share-perm read">read</span>
+              <button class="share-remove" aria-label="Remove @carol">×</button>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── IN CONTEXT: editor toolbar ─── -->
+<div class="demo-section">
+  <div class="demo-label">In context — editor toolbar with dropdown open</div>
+
+  <div class="toolbar-demo">
+    <span class="toolbar-path">wiki/entities/google.md</span>
+    <div class="toolbar-actions">
+      <button class="toolbar-btn">Preview</button>
+      <button class="toolbar-btn">History</button>
+      <div class="toolbar-dropdown-wrapper">
+        <button class="toolbar-btn vis-trigger">🌐 Public (read) ▾</button>
+        <div class="toolbar-dropdown">
+          <div class="vis-panel">
+            <div class="vis-panel-header">
+              Page visibility
+              <button class="close-btn" aria-label="Close">×</button>
+            </div>
+
+            <div class="vis-options">
+              <button class="vis-option">
+                <span class="vis-opt-icon">🔒</span>
+                <div class="vis-opt-text">
+                  <div class="vis-opt-label">Private</div>
+                  <div class="vis-opt-desc">Only you can see this page</div>
+                </div>
+                <span class="vis-opt-check"></span>
+              </button>
+
+              <button class="vis-option selected">
+                <span class="vis-opt-icon">🌐</span>
+                <div class="vis-opt-text">
+                  <div class="vis-opt-label">Public (read)</div>
+                  <div class="vis-opt-desc">Anyone can read, only you can edit</div>
+                </div>
+                <span class="vis-opt-check">✓</span>
+              </button>
+
+              <button class="vis-option">
+                <span class="vis-opt-icon">🌐 ✏️</span>
+                <div class="vis-opt-text">
+                  <div class="vis-opt-label">Public (edit)</div>
+                  <div class="vis-opt-desc">Anyone can read and edit, no account required</div>
+                </div>
+                <span class="vis-opt-check"></span>
+              </button>
+
+              <button class="vis-option">
+                <span class="vis-opt-icon">👁</span>
+                <div class="vis-opt-text">
+                  <div class="vis-opt-label">Unlisted (read)</div>
+                  <div class="vis-opt-desc">Accessible by URL, not discoverable</div>
+                </div>
+                <span class="vis-opt-check"></span>
+              </button>
+
+              <button class="vis-option">
+                <span class="vis-opt-icon">👁 ✏️</span>
+                <div class="vis-opt-text">
+                  <div class="vis-opt-label">Unlisted (edit)</div>
+                  <div class="vis-opt-desc">Anyone with URL can read and edit</div>
+                </div>
+                <span class="vis-opt-check"></span>
+              </button>
+            </div>
+
+            <div class="share-section">
+              <div class="share-section-title">Share with user</div>
+
+              <div class="share-input-row">
+                <input type="text" placeholder="@username">
+                <div class="perm-toggle">
+                  <button class="active">read</button>
+                  <button>edit</button>
+                </div>
+                <button class="btn-add">Add</button>
+              </div>
+
+              <ul class="share-list">
+                <li>
+                  <div class="share-user">
+                    <div class="user-avatar">B</div>
+                    <span class="username">@bob</span>
+                  </div>
+                  <div class="share-right">
+                    <span class="share-perm edit">edit</span>
+                    <button class="share-remove" aria-label="Remove @bob">×</button>
+                  </div>
+                </li>
+                <li>
+                  <div class="share-user">
+                    <div class="user-avatar">C</div>
+                    <span class="username">@carol</span>
+                  </div>
+                  <div class="share-right">
+                    <span class="share-perm read">read</span>
+                    <button class="share-remove" aria-label="Remove @carol">×</button>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="toolbar-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// toggle visibility options
+document.querySelectorAll('.vis-options').forEach(group => {
+  group.addEventListener('click', e => {
+    const opt = e.target.closest('.vis-option');
+    if (!opt) return;
+    group.querySelectorAll('.vis-option').forEach(o => {
+      o.classList.remove('selected');
+      o.querySelector('.vis-opt-check').textContent = '';
+    });
+    opt.classList.add('selected');
+    opt.querySelector('.vis-opt-check').textContent = '\u2713';
+  });
+});
+
+// toggle permission read/edit
+document.querySelectorAll('.perm-toggle').forEach(toggle => {
+  toggle.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    toggle.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
