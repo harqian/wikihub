@@ -494,6 +494,35 @@ def patch_page(owner, slug, page_path):
         if page.visibility != "private":
             sync_page_to_repo(owner, slug, new_path, content)
 
+        # rewrite wikilinks in other pages that reference the old path
+        import re
+        old_title = old_path.replace(".md", "").rsplit("/", 1)[-1]
+        new_title = new_path.replace(".md", "").rsplit("/", 1)[-1]
+        old_path_no_ext = old_path.replace(".md", "")
+        new_path_no_ext = new_path.replace(".md", "")
+
+        other_pages = Page.query.filter_by(wiki_id=wiki.id).filter(Page.path != new_path).all()
+        for other in other_pages:
+            other_content = None
+            if other.private_content:
+                other_content = other.private_content
+            else:
+                other_content = read_file_from_repo(owner, slug, other.path)
+            if not other_content:
+                continue
+
+            updated = other_content
+            # rewrite [[old-title]] -> [[new-title]] and [[old/path]] -> [[new/path]]
+            updated = updated.replace(f"[[{old_title}]]", f"[[{new_title}]]")
+            updated = updated.replace(f"[[{old_path_no_ext}]]", f"[[{new_path_no_ext}]]")
+            updated = updated.replace(f"[[{old_path}]]", f"[[{new_path}]]")
+
+            if updated != other_content:
+                if other.private_content:
+                    other.private_content = updated
+                else:
+                    sync_page_to_repo(owner, slug, other.path, updated)
+
     # update content if provided
     if "content" in data:
         content = data["content"]
@@ -580,9 +609,11 @@ def search_pages():
         Page.search_vector.op("@@")(db.func.plainto_tsquery("english", q))
     )
 
-    # tag filter
+    # tag filter — search tags as text cast of the JSON field
     if tag:
-        query = query.filter(Page.frontmatter_json["tags"].astext.contains(tag))
+        query = query.filter(
+            db.cast(Page.frontmatter_json["tags"], db.String).contains(tag)
+        )
 
     total = query.count()
     results = query.order_by(

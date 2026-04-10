@@ -51,6 +51,39 @@ def user_profile(username):
     return render_template("profile.html", owner=owner, wikis=wikis, total_stars=total_stars)
 
 
+@wiki_bp.route("/@<username>/<slug>/llms.txt")
+def wiki_llms_txt(username, slug):
+    """per-wiki LLM-readable index."""
+    owner = User.query.filter_by(username=username).first_or_404()
+    wiki = Wiki.query.filter_by(owner_id=owner.id, slug=slug).first_or_404()
+
+    lines = [
+        f"# {wiki.title or wiki.slug}",
+        f"> {wiki.description or 'A wiki on wikihub.'}",
+        f"",
+        f"Owner: @{owner.username}",
+        f"URL: /@{owner.username}/{wiki.slug}",
+        f"",
+        "## Pages",
+    ]
+
+    pages = Page.query.filter_by(wiki_id=wiki.id).filter(
+        Page.visibility.in_(["public", "public-edit"])
+    ).order_by(Page.path).all()
+
+    for p in pages:
+        url = f"/@{owner.username}/{wiki.slug}/{p.path.replace('.md', '')}"
+        lines.append(f"- [{p.title or p.path}]({url})")
+
+    if not pages:
+        lines.append("(no public pages)")
+
+    return Response(
+        "\n".join(lines),
+        content_type="text/plain; charset=utf-8",
+    )
+
+
 @wiki_bp.route("/@<username>/<slug>.zip")
 def wiki_zip(username, slug):
     """ZIP download — git archive. owner gets full repo, others get public mirror."""
@@ -163,12 +196,14 @@ def wiki_page(username, slug, page_path):
             "visibility": resolve_visibility(file_path, acl_rules),
         })()
 
+    has_private_bands = "<!-- private -->" in content.lower() if content else False
     rendered = render_page(content, username, slug)
     sidebar_items = _build_sidebar(username, slug, file_path)
 
     return render_template("reader.html",
         owner=owner, wiki=wiki, page=page,
         rendered_html=rendered, sidebar_items=sidebar_items,
+        has_private_bands=has_private_bands,
     ), 200, {
         "Vary": "Accept",
         "Link": f'</@{username}/{slug}/{page_path}.md>; rel="alternate"; type="text/markdown"',
