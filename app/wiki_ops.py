@@ -1,0 +1,293 @@
+import hashlib
+import os
+import re
+import shutil
+from datetime import date, datetime
+
+from app import db
+from app.acl import parse_acl, parse_serve_inline, resolve_visibility
+from app.content_utils import extract_wikilinks, parse_markdown_document
+from app.git_backend import _repo_path, init_wiki_repo
+from app.git_sync import list_files_in_repo, read_file_from_repo, regenerate_public_mirror, scaffold_wiki, sync_page_to_repo
+from app.models import Page, Wikilink, Wiki, Star, Fork, User, PendingInvite
+
+
+def _sanitize_for_json(obj):
+    """convert non-JSON-serializable types (date, datetime) to strings."""
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_for_json(v) for v in obj]
+    if isinstance(obj, (date, datetime)):
+        return obj.isoformat()
+    return obj
+
+
+def load_acl_rules(username, slug):
+    acl_content = read_file_from_repo(username, slug, ".wikihub/acl")
+    return parse_acl(acl_content) if acl_content else []
+
+
+def load_serve_inline_patterns(username, slug):
+    """load the owner opt-in list (.wikihub/serve-inline) of glob patterns whose
+    matching files should be served INLINE with their natural Content-Type
+    instead of as a forced download. See app.acl.parse_serve_inline. Returns []
+    when the file is absent (the safe default — everything non-md downloads).
+
+    Read from the AUTHORITATIVE repo only (never the public mirror), exactly like
+    load_acl_rules reads .wikihub/acl. .wikihub/* are owner-authored plumbing
+    files: they're skipped during page indexing and stripped from the public
+    mirror (regenerate_public_mirror defaults non-md files to private), so the
+    mirror has no copy. Reading the mirror always returned [] — the opt-in
+    silently never applied for anonymous/public readers (wikihub-6ag bug)."""
+    content = read_file_from_repo(username, slug, ".wikihub/serve-inline")
+    return parse_serve_inline(content) if content else []
+
+
+def _plain_excerpt(text, length=200):
+    """strip markdown syntax to produce a plain-text excerpt."""
+    t = text
+    t = re.sub(r"\[\[([^|\]]+)\|([^\]]+)\]\]", r"\2", t)  # [[target|display]] → display
+    t = re.sub(r"\[\[([^\]]+)\]\]", r"\1", t)              # [[page]] → page
+    t = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", t)         # [text](url) → text
+    t = re.sub(r"^#{1,6}\s+", "", t, flags=re.MULTILINE)   # strip heading markers
+    t = re.sub(r"\*\*([^*]+)\*\*", r"\1", t)               # **bold** → bold
+    t = re.sub(r"\*([^*]+)\*", r"\1", t)                    # *italic* → italic
+    t = re.sub(r"`([^`]+)`", r"\1", t)                      # `code` → code
+    t = re.sub(r"^[-*>]\s+", "", t, flags=re.MULTILINE)    # strip list/blockquote markers
+    t = t.replace("\n", " ").strip()
+    t = re.sub(r"\s+", " ", t)
+    return t[:length]
+
+
+def update_page_metadata(page, content, frontmatter=None):
+    try:
+        if frontmatter is None:
+            frontmatter, body = parse_markdown_document(content)
+        else:
+            _, body = parse_markdown_document(content)
+    except Exception:
+        frontmatter = frontmatter or {}
+        body = content
+
+    page.title = frontmatter.get("title", os.path.splitext(os.path.basename(page.path))[0])
+    if isinstance(page.title, (date, datetime)):
+        page.title = str(page.title)
+    page.frontmatter_json = _sanitize_for_json(frontmatter)
+    page.content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    page.excerpt = _plain_excerpt(body) if body else ""
+    page.search_vector = db.func.to_tsvector("english", f"{page.title or ''} {body or ''}")
+    return frontmatter, body
+
+
+def refresh_wikilinks_for_page(page, content):
+    Wikilink.query.filter_by(source_page_id=page.id).delete()
+    targets = extract_wikilinks(content)
+    if not targets:
+        return
+
+    wiki_pages = {
+        candidate.path: candidate.id
+        for candidate in Page.query.filter_by(wiki_id=page.wiki_id).all()
+    }
+    basename_pages = {}
+    for candidate in Page.query.filter_by(wiki_id=page.wiki_id).all():
+        basename = candidate.path.rsplit("/", 1)[-1]
+        basename_pages.setdefault(basename, candidate.id)
+        if basename.endswith(".md"):
+            basename_pages.setdefault(basename[:-3], candidate.id)
+
+    seen = set()
+    for target in targets:
+        if target in seen:
+            continue
+        seen.add(target)
+        normalized = target if target.endswith(".md") else f"{target}.md"
+        target_page_id = wiki_pages.get(normalized) or wiki_pages.get(target) or basename_pages.get(target)
+        db.session.add(
+            Wikilink(
+                source_page_id=page.id,
+                target_path=target,
+                target_page_id=target_page_id,
+            )
+        )
+
+
+def sync_wiki_counters(wiki):
+    wiki.star_count = Star.query.filter_by(wiki_id=wiki.id).count()
+    wiki.fork_count = Fork.query.filter_by(source_wiki_id=wiki.id).count()
+
+
+def create_wiki_for_user(user, slug, title=None, description="", scaffold=True, template="structured"):
+    wiki = Wiki(
+        owner_id=user.id,
+        slug=slug,
+        title=title or slug,
+        description=description or "",
+    )
+    db.session.add(wiki)
+    db.session.flush()
+
+    init_wiki_repo(user.username, slug)
+    if scaffold:
+        scaffold_wiki(user.username, slug, template=template)
+        index_repo_pages(user.username, slug, wiki, reset=True)
+        regenerate_public_mirror(user.username, slug, load_acl_rules(user.username, slug))
+
+    return wiki
+
+
+def ensure_personal_wiki(user):
+    personal = Wiki.query.filter_by(owner_id=user.id, slug=user.username).first()
+    if personal:
+        return personal
+    return create_wiki_for_user(
+        user,
+        slug=user.username,
+        title=user.display_name or user.username,
+        description=None,
+        scaffold=True,
+    )
+
+
+def ensure_official_wiki():
+    """Ensure the @wikihub user exists. The personal wiki (slug=wikihub) is
+    auto-created by ensure_personal_wiki; no separate 'wiki' slug needed."""
+    user = User.query.filter_by(username="wikihub").first()
+    if not user:
+        user = User(username="wikihub", display_name="wikihub")
+        db.session.add(user)
+        db.session.flush()
+
+    ensure_personal_wiki(user)
+    return Wiki.query.filter_by(owner_id=user.id, slug="wikihub").first()
+
+
+def replace_acl_file(username, slug, content, message="Update ACL"):
+    sync_page_to_repo(username, slug, ".wikihub/acl", content, message=message)
+
+
+def materialize_pending_invites_for(user):
+    """turn any PendingInvite rows for this user's email into real ACL grants.
+    only runs when the user has a verified email — callers should set
+    email_verified_at before invoking. returns a list of applied grants
+    (for audit / notification callers).
+    """
+    if not user or not user.email or not user.email_verified_at:
+        return []
+
+    invites = (
+        PendingInvite.query
+        .filter_by(email=user.email.strip().lower())
+        .all()
+    )
+    if not invites:
+        return []
+
+    applied = []
+    # group invites by wiki so we open each ACL file once
+    by_wiki = {}
+    for inv in invites:
+        by_wiki.setdefault(inv.wiki_id, []).append(inv)
+
+    for wiki_id, rows in by_wiki.items():
+        wiki = db.session.get(Wiki, wiki_id)
+        if not wiki:
+            for r in rows:
+                db.session.delete(r)
+            continue
+        owner = db.session.get(User, wiki.owner_id)
+        if not owner:
+            continue
+
+        acl_text = read_file_from_repo(owner.username, wiki.slug, ".wikihub/acl", public=False) or "* private\n"
+        existing_lines = set(acl_text.splitlines())
+        new_lines = []
+        for r in rows:
+            line = f"{r.pattern} @{user.username}:{r.role}"
+            if line not in existing_lines:
+                existing_lines.add(line)
+                new_lines.append(line)
+            applied.append({
+                "wiki": f"{owner.username}/{wiki.slug}",
+                "wiki_id": wiki.id,
+                "pattern": r.pattern,
+                "role": r.role,
+            })
+            db.session.delete(r)
+
+        if new_lines:
+            acl_text = acl_text.rstrip() + "\n" + "\n".join(new_lines) + "\n"
+            sync_page_to_repo(
+                owner.username, wiki.slug, ".wikihub/acl", acl_text,
+                message=f"Materialize pending invite(s) for @{user.username}",
+            )
+            acl_rules = load_acl_rules(owner.username, wiki.slug)
+            index_repo_pages(owner.username, wiki.slug, wiki, reset=True)
+            regenerate_public_mirror(owner.username, wiki.slug, acl_rules)
+
+    return applied
+
+
+def delete_wiki_repos(username, slug):
+    for public in (False, True):
+        repo = _repo_path(username, slug, public=public)
+        if os.path.isdir(repo):
+            shutil.rmtree(repo)
+
+
+def index_repo_pages(username, slug, wiki, reset=False):
+    acl_rules = load_acl_rules(username, slug)
+
+    if reset:
+        Page.query.filter_by(wiki_id=wiki.id).delete()
+        db.session.flush()
+
+    existing_pages = {
+        page.path: page
+        for page in Page.query.filter_by(wiki_id=wiki.id).all()
+    }
+    seen_paths = set()
+
+    for path in list_files_in_repo(username, slug):
+        # Skip git/wikihub plumbing
+        if path.endswith(".gitkeep") or path.startswith(".wikihub/"):
+            continue
+
+        is_md = path.endswith(".md")
+
+        if is_md:
+            content = read_file_from_repo(username, slug, path)
+            if content is None:
+                continue
+            frontmatter, _ = parse_markdown_document(content)
+        else:
+            # Non-markdown files (transcripts, datasets, images, etc.) get Page rows
+            # so they appear in sidebar/listings/search. No frontmatter parsing — just
+            # path + ACL-derived visibility. The actual file bytes are served by the
+            # binary handler in app/routes/wiki.py.
+            content = ""
+            frontmatter = {}
+
+        visibility = resolve_visibility(path, acl_rules, frontmatter.get("visibility"))
+        page = existing_pages.get(path)
+        if page is None:
+            page = Page(wiki_id=wiki.id, path=path)
+            db.session.add(page)
+        page.visibility = visibility
+        update_page_metadata(page, content, frontmatter)
+        seen_paths.add(path)
+
+    for path, page in existing_pages.items():
+        if path not in seen_paths:
+            db.session.delete(page)
+
+    db.session.flush()
+
+    pages = Page.query.filter_by(wiki_id=wiki.id).all()
+    content_by_path = {
+        page.path: read_file_from_repo(username, slug, page.path) or ""
+        for page in pages
+    }
+    for page in pages:
+        refresh_wikilinks_for_page(page, content_by_path[page.path])

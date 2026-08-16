@@ -14,14 +14,27 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
     display_name = db.Column(db.String(128))
-    email = db.Column(db.String(256), unique=True, nullable=True)
+    # Uniqueness enforced only for verified emails (partial index below), so
+    # two users may claim the same unverified email — first to verify wins.
+    email = db.Column(db.String(256), nullable=True)
+    email_verified_at = db.Column(db.DateTime(timezone=True), nullable=True)
     password_hash = db.Column(db.String(256), nullable=True)  # null for oauth-only users
     google_id = db.Column(db.String(256), unique=True, nullable=True)
+    llm_api_key_encrypted = db.Column(db.Text, nullable=True)  # encrypted Anthropic API key for Curator
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
 
     wikis = db.relationship("Wiki", backref="owner", lazy="dynamic")
     api_keys = db.relationship("ApiKey", backref="user", lazy="dynamic")
     stars = db.relationship("Star", backref="user", lazy="dynamic")
+
+    __table_args__ = (
+        db.Index(
+            "ux_users_email_verified",
+            "email",
+            unique=True,
+            postgresql_where=db.text("email_verified_at IS NOT NULL"),
+        ),
+    )
 
 
 class Wiki(db.Model):
@@ -32,6 +45,7 @@ class Wiki(db.Model):
     slug = db.Column(db.String(128), nullable=False)
     title = db.Column(db.String(256))
     description = db.Column(db.Text)
+    subdomain = db.Column(db.String(63), unique=True, nullable=True)
     forked_from_id = db.Column(db.Integer, db.ForeignKey("wikis.id"), nullable=True)
     star_count = db.Column(db.Integer, default=0, nullable=False)
     fork_count = db.Column(db.Integer, default=0, nullable=False)
@@ -47,8 +61,7 @@ class Wiki(db.Model):
 
 
 class Page(db.Model):
-    """derived metadata index for public pages (content lives in git).
-    private pages store content here directly (never enters git)."""
+    """derived metadata index for markdown pages. content lives in git."""
     __tablename__ = "pages"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -57,11 +70,13 @@ class Page(db.Model):
     title = db.Column(db.String(512))
     visibility = db.Column(db.String(32), default="private", nullable=False)
     frontmatter_json = db.Column(db.JSON)
-    excerpt = db.Column(db.String(500))  # ~200 chars for search results
+    excerpt = db.Column(db.String(200))  # ~200 chars for search results
     content_hash = db.Column(db.String(64))
-    # private page content — only populated when visibility=private and page doesn't enter git
-    private_content = db.Column(db.Text, nullable=True)
-    author = db.Column(db.String(256), nullable=True)  # nullable for anonymous writes
+    author = db.Column(db.String(256), nullable=True)  # original author (preserved for audit even when anonymous)
+    # anonymous posting (wikihub-7b2r) — hides author in API/UI when anonymous=True,
+    # claimable (only meaningful when anonymous) lets any authed user claim first-come-first-served.
+    anonymous = db.Column(db.Boolean, default=False, nullable=False)
+    claimable = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
@@ -86,6 +101,23 @@ class Wikilink(db.Model):
 
     source_page = db.relationship("Page", foreign_keys=[source_page_id])
     target_page = db.relationship("Page", foreign_keys=[target_page_id])
+
+    # Backlink lookups — see migrations/2026-04-29_wikilinks_backlink_indexes.sql.
+    # Partial indexes mirror the migration so fresh DBs (tests, new installs)
+    # match dev/prod exactly. (1) covers the resolved-target lookup,
+    # (2) covers the forward-ref alias fallback.
+    __table_args__ = (
+        db.Index(
+            "ix_wikilinks_target_page_id",
+            "target_page_id",
+            postgresql_where=db.text("target_page_id IS NOT NULL"),
+        ),
+        db.Index(
+            "ix_wikilinks_unresolved_target_path",
+            "target_path",
+            postgresql_where=db.text("target_page_id IS NULL"),
+        ),
+    )
 
 
 class Star(db.Model):
@@ -118,6 +150,118 @@ class Fork(db.Model):
     )
 
 
+class PendingInvite(db.Model):
+    """a share grant addressed to an email that has no account yet.
+    materialized into an ACL grant when a user signs up and verifies that email."""
+    __tablename__ = "pending_invites"
+
+    id = db.Column(db.Integer, primary_key=True)
+    wiki_id = db.Column(db.Integer, db.ForeignKey("wikis.id", ondelete="CASCADE"), nullable=False)
+    pattern = db.Column(db.String(512), nullable=False)  # e.g. "*" or "research/*"
+    email = db.Column(db.String(256), nullable=False, index=True)
+    role = db.Column(db.String(16), nullable=False)  # "read" | "edit"
+    # Random per-invite token embedded in the invite-email URL as ?it=.
+    # Valid token at signup/login = proof the user received our email = one-click
+    # verify. Nullable so pre-token rows (from before wikihub-yjsv) keep working
+    # via the fallback verify-email flow.
+    token = db.Column(db.String(64), nullable=True, index=True)
+    invited_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+
+    wiki = db.relationship("Wiki")
+    invited_by = db.relationship("User", foreign_keys=[invited_by_id])
+
+    __table_args__ = (
+        db.UniqueConstraint("wiki_id", "pattern", "email", name="uq_pending_invite"),
+    )
+
+
+class Proposal(db.Model):
+    """owner-reviewed suggested edit workflow for one or more wiki pages."""
+    __tablename__ = "proposals"
+
+    id = db.Column(db.Integer, primary_key=True)
+    wiki_id = db.Column(db.Integer, db.ForeignKey("wikis.id", ondelete="CASCADE"), nullable=False, index=True)
+    page_id = db.Column(db.Integer, db.ForeignKey("pages.id", ondelete="SET NULL"), nullable=True, index=True)
+    page_path = db.Column(db.Text, nullable=False)
+    author_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    author_name = db.Column(db.String(256), nullable=True)
+    title = db.Column(db.String(256), nullable=False)
+    status = db.Column(db.String(32), default="pending", nullable=False, index=True)
+    base_content_hash = db.Column(db.String(64), nullable=True)
+    reviewed_by_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    wiki = db.relationship("Wiki", backref=db.backref("proposals", lazy="dynamic"))
+    page = db.relationship("Page")
+    author = db.relationship("User", foreign_keys=[author_id])
+    reviewed_by = db.relationship("User", foreign_keys=[reviewed_by_id])
+    revisions = db.relationship(
+        "ProposalRevision",
+        backref="proposal",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+        order_by="ProposalRevision.revision_number",
+    )
+    comments = db.relationship(
+        "ProposalComment",
+        backref="proposal",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+        order_by="ProposalComment.created_at",
+    )
+
+
+class ProposalRevision(db.Model):
+    __tablename__ = "proposal_revisions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    proposal_id = db.Column(db.Integer, db.ForeignKey("proposals.id", ondelete="CASCADE"), nullable=False, index=True)
+    revision_number = db.Column(db.Integer, nullable=False)
+    note = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+
+    patches = db.relationship(
+        "ProposalPagePatch",
+        backref="revision",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+        order_by="ProposalPagePatch.id",
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint("proposal_id", "revision_number", name="uq_proposal_revision_number"),
+    )
+
+
+class ProposalPagePatch(db.Model):
+    __tablename__ = "proposal_page_patches"
+
+    id = db.Column(db.Integer, primary_key=True)
+    revision_id = db.Column(db.Integer, db.ForeignKey("proposal_revisions.id", ondelete="CASCADE"), nullable=False, index=True)
+    page_path = db.Column(db.Text, nullable=False)
+    base_content_hash = db.Column(db.String(64), nullable=True)
+    base_content = db.Column(db.Text, nullable=False)
+    proposed_content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class ProposalComment(db.Model):
+    __tablename__ = "proposal_comments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    proposal_id = db.Column(db.Integer, db.ForeignKey("proposals.id", ondelete="CASCADE"), nullable=False, index=True)
+    author_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    author_name = db.Column(db.String(256), nullable=True)
+    body = db.Column(db.Text, nullable=False)
+    event = db.Column(db.String(32), default="comment", nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+
+    author = db.relationship("User")
+
+
 class ApiKey(db.Model):
     __tablename__ = "api_keys"
 
@@ -132,25 +276,94 @@ class ApiKey(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
 
 
-class Session(db.Model):
-    __tablename__ = "sessions"
+class MagicLoginToken(db.Model):
+    __tablename__ = "magic_login_tokens"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = db.Column(db.String(256), nullable=False, unique=True, index=True)
+    redirect_path = db.Column(db.String(512), nullable=False, default="/")
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    used_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+
+    user = db.relationship("User")
+
+
+class EmailVerificationToken(db.Model):
+    """one-time token sent to a user's email at signup (or when they add/change
+    email). consuming the token sets users.email_verified_at."""
+    __tablename__ = "email_verification_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     token_hash = db.Column(db.String(256), nullable=False, unique=True)
+    new_email = db.Column(db.String(256), nullable=False)
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    used_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+
+    user = db.relationship("User")
+
+
+class PasswordResetToken(db.Model):
+    """single-use password-reset token sent to a claimed account email."""
+    __tablename__ = "password_reset_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = db.Column(db.String(256), nullable=False, unique=True)
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    used_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+
+    user = db.relationship("User")
+
+
+class UsernameRedirect(db.Model):
+    __tablename__ = "username_redirects"
+
+    id = db.Column(db.Integer, primary_key=True)
+    old_username = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
 
     user = db.relationship("User")
 
 
-class AuditLog(db.Model):
-    __tablename__ = "audit_log"
+class Feedback(db.Model):
+    """user feedback (bug/feature/comment/praise) submitted via /api/v1/feedback.
+    open/public endpoint — raw IP is never stored; only a daily-salted sha256."""
+    __tablename__ = "feedback"
+
+    id = db.Column(db.String(32), primary_key=True)  # e.g. "fb_abc12345"
+    kind = db.Column(db.String(16), nullable=False, index=True)  # bug|feature|comment|praise
+    subject = db.Column(db.String(200), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    context_json = db.Column(db.JSON)
+    contact_email = db.Column(db.String(256), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    ip_hash = db.Column(db.String(64), nullable=True, index=True)  # sha256(ip + daily_salt)
+    status = db.Column(db.String(32), nullable=False, default="received")  # received|triaged|resolved|wontfix
+    resolution_notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False, index=True)
+    resolved_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    user = db.relationship("User")
+
+
+class WikiSlugRedirect(db.Model):
+    __tablename__ = "wiki_slug_redirects"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    action = db.Column(db.String(64), nullable=False)  # e.g. "page.create", "wiki.fork"
-    target_type = db.Column(db.String(32))  # "page", "wiki", "user"
-    target_id = db.Column(db.Integer)
-    detail_json = db.Column(db.JSON)
+    owner_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    old_slug = db.Column(db.String(128), nullable=False, index=True)
+    wiki_id = db.Column(db.Integer, db.ForeignKey("wikis.id"), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("owner_id", "old_slug", name="uq_slug_redirect_owner_slug"),
+    )
+
+    wiki = db.relationship("Wiki")

@@ -2,8 +2,15 @@ __pycache__/
 *.pyc
 .env
 repos/
+repos_test/
 *.egg-info/
 dist/
 build/
 .venv/
 venv/
+wikihub-dev-access/
+backups/
+.DS_Store
+archive/
+electron/node_modules/
+electron/dist/
